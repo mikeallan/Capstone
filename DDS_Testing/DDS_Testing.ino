@@ -18,10 +18,6 @@ const byte DDS_CLOCK_pin = 11; // Loads one bit, W_CLK
 const byte DDS_UPDATE_pin = 12; // Shifts register, FQ_UD
 
 // Variable declaration
-const unsigned long max_frequency_step = 0.1; // Max Frequency in MHz
-const unsigned long max_frequency = 10;       // Max Frequency in MHz
-const int min_frequency = 1;                  // Minimum Frequency in MHz
-
 unsigned long Vi;
 unsigned long Vs;
 unsigned long Vz;
@@ -31,11 +27,14 @@ unsigned long SWR;      // Standing wave ratio
 unsigned long Zin_Mag;  // Magnitude of Zin
 unsigned long Zin_Re;   // Real component of Zin
 
-// Convert frequencies to Hz
-const unsigned int max_frequency_step = max_frequency_step * 1000000;
-const unsigned int max_frequency = max_frequency * 1000000;
-const unsigned int min_frequency = min_frequency * 1000000;
+unsigned long max_frequency_step = 100000;  // Max Frequency
+unsigned long max_frequency = 10000000;     // Max Frequency
+int min_frequency = 1000000;                // Minimum Frequency
 
+
+// ***
+// *** Setup function
+// ***
 void setup() {
   Serial.begin(115200);
 
@@ -50,11 +49,12 @@ void setup() {
   pinMode(DDS_DATA_pin, OUTPUT);
   pinMode(DDS_CLOCK_pin, OUTPUT);
   pinMode(DDS_UPDATE_pin, OUTPUT);
-
-/*  // DDS Reset is active high
-  digitalWrite(DDS_RESET_pin, HIGH);*/
 }
 
+
+// ***
+// *** Main loop function
+// ***
 void loop() {
   // put your main code here, to run repeatedly:
 //  digitalWrite(DATA_pin, HIGH);
@@ -63,13 +63,33 @@ void loop() {
 //  delay(1500);
 //
 
-  digitalWrite(DATA_pin, LOW);
-  digitalWrite(CLOCK_pin, LOW);
-  digitalWrite(UPDATE_pin, LOW);
+  digitalWrite(DDS_DATA_pin, LOW);
+  digitalWrite(DDS_CLOCK_pin, LOW);
+  digitalWrite(DDS_UPDATE_pin, LOW);
   delay(1500);
+
+  delayMicroseconds(1);
+  digitalWrite(DDS_UPDATE_pin, HIGH);
+  delayMicroseconds(1);
+  digitalWrite(DDS_UPDATE_pin, LOW);
 }
 
-// Function to read the four voltages
+
+// ***
+// *** Function to initialize the DDS chip
+// ***
+void init_dds()
+{
+  digitalWrite(DDS_RESET_pin, LOW);
+  digitalWrite(DDS_DATA_pin, LOW);
+  digitalWrite(DDS_CLOCK_pin, LOW);
+  digitalWrite(DDS_UPDATE_pin, LOW);
+}
+
+
+// ***
+// *** Function to read the four voltages
+// ***
 void ReadVoltages(){
   Vi=analogRead(Vi_pin);
   Vs=analogRead(Vs_pin);
@@ -78,7 +98,9 @@ void ReadVoltages(){
 }
 
 
-// Function to convert the voltages to an impedence
+// ***
+// *** Function to convert the voltages to an impedence
+// ***
 void Calculate(){
   rho=Vr/(Vi/2);                                       //reflection coeff
   SWR=(1+abs(rho))/(1-abs(rho));                       //standing wave ratio
@@ -86,3 +108,46 @@ void Calculate(){
   Zin_Re = (Zin_Mag^2 + 50^2)*SWR/(50*(SWR^2+1));      //real componend of Zin
 }
 
+
+// ***
+// *** Function to send desired frequency to DDS chip
+// ***
+void writeDDSchip(unsigned long freq){
+  
+  // Variables
+  unsigned long DDSLong;
+  unsigned long bitMask32 = 0b00000000000000000000000000000001;
+  byte last8 = 0b00000000;
+  byte bitMask8 = 0b00000001;
+  float clock_freq = 40000000; // 40 MHz
+
+  // Calculate the first 32 bits of the 40 bit DDS instruction
+  DDSLong = freq * pow(2,32) / clock_freq;
+
+  // Write frequency values (dependent on the input)
+  for (bitMask32=1; bitMask32>0; bitMask32 <<= 1){ // iterate through 32 bits of DDSLong
+    if (DDSLong & bitMask32) digitalWrite(DDS_DATA_pin, HIGH);
+    else digitalWrite(DDS_DATA_pin, LOW);
+
+    // Toggle clock pin for DDS to receive the data after every single bit
+    digitalWrite(DDS_CLOCK_pin, HIGH);
+    delayMicroseconds(1);
+    digitalWrite(DDS_CLOCK_pin, LOW);
+  }
+
+  // Write last 8 values (constant everytime)
+  for (bitMask8=1; bitMask8>0; bitMask8 <<= 1){ // iterate through 8 bits
+    if (last8 & bitMask8) digitalWrite(DDS_DATA_pin, HIGH);
+    else digitalWrite(DDS_DATA_pin, LOW);
+
+    // Toggle clock pin for DDS to receive the data after every single bit
+    digitalWrite(DDS_CLOCK_pin, HIGH);
+    delayMicroseconds(1);
+    digitalWrite(DDS_CLOCK_pin, LOW);
+  }
+
+  // Update DDS
+  digitalWrite(DDS_UPDATE_pin, HIGH);
+  delayMicroseconds(1);
+  digitalWrite(DDS_UPDATE_pin, LOW);
+}
