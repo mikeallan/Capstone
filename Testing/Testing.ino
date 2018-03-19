@@ -14,7 +14,7 @@
 #define FACTORYRESET_ENABLE         0
 #define MINIMUM_FIRMWARE_VERSION    "0.6.6"
 #define MODE_LED_BEHAVIOUR          "MODE"
-#define SEND_SECOND_PLOT            0
+#define SEND_SECOND_PLOT            1
 
 /* ...hardware SPI, using SCK/MOSI/MISO hardware SPI pins and then user selected CS/IRQ/RST */
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
@@ -94,22 +94,22 @@ void setup(void)
 
 void loop(void)
 {
-  delay(5);                  //wait 25ms
-
-  
-  y = 1/(std_dev*sqrt(2*pi))*pow(e,-pow((x-mean),2)/(2*pow(std_dev,2)));
-  
-  // uint8_t val = random(0, 255); //find random value
-  ble.print(y);               //send value to bluefruit uart
-  
+//  delay(5);                  //wait 25ms
+//
+//  
+//  y = 1/(std_dev*sqrt(2*pi))*pow(e,-pow((x-mean),2)/(2*pow(std_dev,2)));
+//  
+//  // uint8_t val = random(0, 255); //find random value
+//  ble.print(y);               //send value to bluefruit uart
+//  
   if (SEND_SECOND_PLOT) {               //change SEND_SECOND_PLOT to 1 for add'l sine plot
     if (sineIndex > 255) sineIndex = 0; //stay within bounds of sine table
-    ble.print(",");                     //print delimiter for second plot
+//    ble.print(",");                     //print delimiter for second plot
     ble.print(sine_wave[sineIndex]);    //print value from sine table
     sineIndex++;                        //increment index
   }
 
-  x = x+0.001;
+//  x = x+0.001;
   ble.println();  //print newline so app knows to plot the values
 }
 
