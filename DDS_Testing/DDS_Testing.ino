@@ -27,9 +27,10 @@ unsigned long SWR;      // Standing wave ratio
 unsigned long Zin_Mag;  // Magnitude of Zin
 unsigned long Zin_Re;   // Real component of Zin
 
-unsigned long max_frequency_step = 100000;  // Max Frequency
-unsigned long max_frequency = 10000000;     // Max Frequency
-int min_frequency = 1000000;                // Minimum Frequency
+unsigned long starting_freq = 100000;  // Starting Frequency
+unsigned long max_freq = 10000000;     // Max Frequency
+unsigned long min_freq = 1000000;                // Minimum Frequency
+unsigned long freq = starting_freq;    // Frequency
 
 
 // ***
@@ -56,22 +57,13 @@ void setup() {
 // *** Main loop function
 // ***
 void loop() {
-  // put your main code here, to run repeatedly:
-//  digitalWrite(DATA_pin, HIGH);
-//  digitalWrite(CLOCK_pin, HIGH);
-//  digitalWrite(UPDATE_pin, HIGH);
-//  delay(1500);
-//
 
   digitalWrite(DDS_DATA_pin, LOW);
   digitalWrite(DDS_CLOCK_pin, LOW);
   digitalWrite(DDS_UPDATE_pin, LOW);
-  delay(1500);
 
-  delayMicroseconds(1);
-  digitalWrite(DDS_UPDATE_pin, HIGH);
-  delayMicroseconds(1);
-  digitalWrite(DDS_UPDATE_pin, LOW);
+  incrementFreq(); // Function to get frequency to write to DDS
+  delay(1000000);
 }
 
 
@@ -106,6 +98,16 @@ void Calculate(){
   SWR=(1+abs(rho))/(1-abs(rho));                       //standing wave ratio
   Zin_Mag=50*Vz/Vs;                                    //magnitude of Zin
   Zin_Re = (Zin_Mag^2 + 50^2)*SWR/(50*(SWR^2+1));      //real componend of Zin
+}
+
+
+// ***
+// *** Function to say which freq to send to DDS
+// ***
+void incrementFreq(){
+  for (unsigned long freq = starting_freq; freq < max_freq; freq += 100000){
+    writeDDSchip(freq);
+  }
 }
 
 
