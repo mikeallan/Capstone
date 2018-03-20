@@ -73,15 +73,15 @@ void setup() {
 // *** Main loop function
 // ***
 void loop() {
-
+  Serial.println(digitalRead(dds_DATA_pin));
   /***** For testing *****/
-  if (counter) {
-    freq = 0*10.e6;
-    writeddschip(freq);
-    readVoltages();
-    calculate();
-  }
-  counter = false;
+//  if (counter) {
+//    freq = 0*10.e6;
+//    writeddschip(freq);
+//    readVoltages();
+//    calculate();
+//  }
+//  counter = false;
 } // end loop()
 
 
