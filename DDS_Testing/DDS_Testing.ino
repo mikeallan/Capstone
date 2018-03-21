@@ -7,7 +7,7 @@
 
 
 //Define a pulsating function
-#define pulseHigh(pin) {digitalWrite(pin, HIGH); delayMicroseconds(1); digitalWrite(pin, LOW); }
+#define pulseHigh(pin) {digitalWrite(pin, HIGH); digitalWrite(pin, LOW); }
 
 
 // Pin assignment
@@ -63,9 +63,7 @@ void setup() {
 //  Serial.println(F("Zin_Re, freq"));
 //  Serial.println(F("------------"));
 
-  pulseHigh(dds_RESET_pin);
-  pulseHigh(dds_W_CLK_pin);
-  pulseHigh(dds_FQ_UD_pin); // this pulse enables serial mode - Datasheet page 12 figure 10
+  init_dds();
 } // end setup()
 
 
@@ -73,15 +71,15 @@ void setup() {
 // *** Main loop function
 // ***
 void loop() {
-  Serial.println(digitalRead(dds_DATA_pin));
   /***** For testing *****/
-//  if (counter) {
-//    freq = 0*10.e6;
-//    writeddschip(freq);
-//    readVoltages();
-//    calculate();
-//  }
-//  counter = false;
+  if (counter) {
+    freq = 30.e6;
+    Serial.println(freq);
+    writeddschip(freq);
+    readVoltages();
+    calculate();
+  }
+  counter = false;
 } // end loop()
 
 
@@ -132,7 +130,7 @@ void writeddschip(unsigned long freq) {
     digitalWrite(dds_W_CLK_pin, LOW);
   }
 
-  Serial.println("\nLast 8\n");
+  Serial.println("\n\nLast 8");
 
   // Write last 8 values (constant everytime)
   for (bitMask8 = 1; bitMask8 > 0; bitMask8 <<= 1) { // iterate through 8 bits
@@ -177,3 +175,27 @@ void calculate() {
   Zin_Mag = 50 * Vz / Vs;                              //magnitude of Zin
   Zin_Re = (Zin_Mag ^ 2 + 50 ^ 2) * SWR / (50 * (SWR ^ 2 + 1)); //real componend of Zin
 } // end of calculate()
+
+
+// ***
+// *** initialize DDS chip
+// ***
+void init_dds(){
+  pulseHigh(dds_RESET_pin);
+  pulseHigh(dds_W_CLK_pin);
+  pulseHigh(dds_FQ_UD_pin);
+  clearDDSReg();
+}
+
+// ***
+// *** Function to clear dds input registers
+// ***
+void clearDDSReg() {
+
+  for(int i=0;i<40;i++){  //writes 0 to all 40 input reg bits
+    digitalWrite(dds_DATA_pin,LOW);
+    pulseHigh(dds_W_CLK_pin);
+  }
+  pulseHigh(dds_FQ_UD_pin);
+} // End of clearDDSReg
+  
