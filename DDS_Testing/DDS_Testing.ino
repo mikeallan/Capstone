@@ -9,10 +9,7 @@
 #define pulseHigh(pin) {digitalWrite(pin, HIGH); digitalWrite(pin, LOW); }
 
 // Pin assignment
-#define Vi_pin A1
-#define Vs_pin A2
-#define Vz_pin A3
-#define Vr_pin A4
+#define Vz_pin A2
 
 #define dds_RESET_pin 6 // dds reset pin - pin 22 on dds
 #define dds_DATA_pin 10 // Serial bit sent to dds - pin 25 on dds
@@ -22,25 +19,16 @@
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 // Variable declaration
-const unsigned long starting_freq = 1000000;  // Starting Frequency
-const unsigned long max_freq = 1200000;       // Max Frequency
-const unsigned long freq_step = 10000;       // Minimum Frequency
+const unsigned long starting_freq = 800000;  // Starting Frequency
+const unsigned long max_freq = 2800000;       // Max Frequency
+const unsigned long freq_step = 20000;       // Minimum Frequency
 unsigned long freq = starting_freq;     // Frequency
-const int arraySize = (max_freq - starting_freq) / (freq_step);
+const int arraySize = (max_freq - starting_freq) / (freq_step) + 1;
 unsigned int counter = 0;
 
-float Vi;
-float Vi_value;
-float Vs;
-float Vs_value;
 float Vz;
-float Vz_value[arraySize];
-float Vr;
-float Vr_value;
-float rho;      // Reflection coefficient
-float SWR;      // Standing wave ratio
-float Zin_Mag;  // Magnitude of Zin
-float Zin_Re;   // Real component of Zin
+float Vz_values[arraySize];
+float Vz_moving_avg[arraySize];
 float data;     // Data to be sent to phone
 
 
@@ -56,10 +44,7 @@ void setup() {
   Serial.begin(115200);
 
   // Voltage reading pins are INPUTs
-  pinMode(Vi_pin, INPUT);
-  pinMode(Vs_pin, INPUT);
   pinMode(Vz_pin, INPUT);
-  pinMode(Vr_pin, INPUT);
 
   // dds pins are OUTPUTs
   pinMode(dds_RESET_pin, OUTPUT);
@@ -68,17 +53,9 @@ void setup() {
   pinMode(dds_FQ_UD_pin, OUTPUT);
 
   // Print the start of the table
-  Serial.print("  Freq ");
-  Serial.print("   ");
-  Serial.print(" Vi");
-  Serial.print("   ");
-  Serial.print(" Vs");
-  Serial.print("   ");
-  Serial.print(" Vz");
-  Serial.print("   ");
-  Serial.print(" Vr");
-  Serial.print("   ");
-  Serial.println("Zin_Re");
+  Serial.print(" Freq ");
+  Serial.print("      ");
+  Serial.println("Vz");
 
   init_dds();
 } // end setup()
@@ -92,32 +69,41 @@ void loop() {
   /***** For testing *****/
   
   for(freq = starting_freq; freq <= max_freq; freq += freq_step){
-    //writeddschip(freq);
-    //delay(1000);
+    if (counter == 0) {delay(5000);}
     
+    writeddschip(freq);
+    delay(1000);
     readVoltages();
-    //calculateImpedance();
-    Vz_value[counter] = Vz;
-    //serialPrintTable();
-    printVzs();
-    counter++;
+
+    serialPrintTable();
   }
 
-  /*for (int i = 0; i < arraySize; i++){
-    Serial.println(Vz_value[i], 4);
-  }*/
-
-  Serial.println("moving averages");
+  Serial.println("\nMoving averages");
   calculateMovingAverage();
 
   for (int i = 0; i < arraySize; i++){
-    Serial.println(Vz_value[i], 4);
+    Serial.println(Vz_moving_avg[i], 4);
   }
-  //writeddschip(1500000);
+  
+  
+  //writeddschip(1000000);
   
   while(1);
   
 } // end loop()
+
+
+
+
+// ***
+// *** initialize DDS chip
+// ***
+void init_dds(){
+  pulseHigh(dds_RESET_pin);
+  delay(10);
+  pulseHigh(dds_W_CLK_pin);
+  pulseHigh(dds_FQ_UD_pin);
+} // end of init_dds()
 
 
 
@@ -177,58 +163,34 @@ void writeddschip(unsigned long freq) {
 // *** Function to read the four voltages
 // ***
 void readVoltages() {
-  Vi = 0;
-  Vs = 0;
-  Vz = 0;
-  Vr = 0;
-
   float numberOfSamples = 2000;
+  Vz = 0;
   
   for (unsigned int i = 0; i < numberOfSamples; i++){
-    //Vi += analogRead(Vi_pin);
-    //Vs += analogRead(Vs_pin);
     Vz += analogRead(Vz_pin);
-    //Vr += analogRead(Vr_pin);
   }
-
-  //Vi = Vi / numberOfSamples;
-  //Vs = Vs / numberOfSamples;
-  Vz = Vz / numberOfSamples;
-  //Vr = Vr / numberOfSamples;
-
-  //Vi = Vi * 3.3 / 1023.0;
-  //Vs = Vs * 3.3 / 1023.0;
-  Vz = Vz * 3.3 / 1023.0;
-  //Vr = Vr * 3.3 / 1023.0;
   
+  Vz = Vz / numberOfSamples;
+  Vz_values[counter] = Vz * 3.3 / 1023.0; // Store calculated values in an array
+  
+  counter++;
 } // end of readVoltages()
 
 
 
 
 // ***
-// *** Function to print the voltages
+// *** Function to calculate the moving average of Vz
 // ***
 void calculateMovingAverage(){
-  for (int i = 4; i < arraySize; i++){
-    Vz_value[i] = (Vz_value[i-4] + Vz_value[i-3] + Vz_value[i-2] + Vz_value[i-1] + Vz_value[i]) / 5;
+  Vz_moving_avg[0] = Vz_values[0];
+  Vz_moving_avg[1] = Vz_values[1];
+  Vz_moving_avg[arraySize-1] = Vz_values[arraySize-1];
+  Vz_moving_avg[arraySize-2] = Vz_values[arraySize-2];
+  for (int i = 2; i < arraySize - 2; i++){
+    Vz_moving_avg[i] = (Vz_values[i+2] + Vz_values[i+1] + Vz_values[i-2] + Vz_values[i-1] + Vz_values[i]) / 5;
   }
 } // end of calculateMovingAverage()
-
-
-
-
-
-void printVzs(){
-  Serial.print(freq);
-  Serial.print("    ");
-  Serial.print(Vz, 4);
-  Serial.print("    ");
-  Serial.println(Vz_value[counter], 4);
-}
-
-
-
 
 
 
@@ -239,58 +201,8 @@ void printVzs(){
 void serialPrintTable(){
   Serial.print(freq);
   Serial.print("   ");
-  Serial.print(Vi, 4);
-  Serial.print("   ");
-  Serial.print(Vs, 4);
-  Serial.print("   ");
-  Serial.print(Vz, 4);
-  Serial.print("   ");
-  Serial.print(Vr, 4);
-  Serial.print("   ");
-  Serial.println(Zin_Re, 4);
+  Serial.println(Vz_values[counter-1], 4);
 } // end of printTable()
-
-
-
-
-// ***
-// *** Function to convert the voltages to an impedence
-// ***
-void calculateImpedance() {
-  rho = Vr / (Vi / 2.0);                                          //reflection coeff
-  //SWR = (abs(0.5*Vi) + abs(Vr)) / (abs((0.5*Vi) - abs(Vr))
-  SWR = (0.5*Vi + Vr) / (0.5*Vi - Vr);
-  //SWR = (1.0 + abs(rho)) / (1.0 - abs(rho));                        //standing wave ratio
-  Zin_Mag = 50.0 * Vz / Vs;                                       //magnitude of Zin
-  Zin_Re = ((pow(Zin_Mag,2.0) + pow(50.0,2.0)) * SWR) / (50.0 * (pow(SWR,2.0) + 1.0)); //real componend of Zin
-} // end of calculateImpedance()
-
-
-
-
-// ***
-// *** initialize DDS chip
-// ***
-void init_dds(){
-  pulseHigh(dds_RESET_pin);
-  delay(10);
-  pulseHigh(dds_W_CLK_pin);
-  pulseHigh(dds_FQ_UD_pin);
-} // end of init_dds()
-
-
-
-
-// ***
-// *** Function to clear dds input registers - not used
-// ***
-void clearDDSReg() {
-  for(int i=0;i<40;i++){  //writes 0 to all 40 input reg bits
-    digitalWrite(dds_DATA_pin,LOW);
-    pulseHigh(dds_W_CLK_pin);
-  }
-  pulseHigh(dds_FQ_UD_pin);
-} // End of clearDDSReg()
 
 
 
