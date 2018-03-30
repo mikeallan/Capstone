@@ -19,16 +19,28 @@
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 // Variable declaration
-const unsigned long starting_freq = 800000;  // Starting Frequency
-const unsigned long max_freq = 2800000;       // Max Frequency
-const unsigned long freq_step = 20000;       // Minimum Frequency
-unsigned long freq = starting_freq;     // Frequency
-const int arraySize = (max_freq - starting_freq) / (freq_step) + 1;
+
+// Need to be const for array size declaration
+const unsigned int initial_starting_freq = 750000;  // Starting Frequency
+const unsigned int initial_max_freq = 2000000;       // Max Frequency
+const unsigned int initial_freq_step = 100000;       // Minimum Frequency
+
+unsigned int freq = initial_starting_freq;
+const int arraySize = (initial_max_freq - initial_starting_freq) / (initial_freq_step) + 1;
+unsigned int freq_values[arraySize];
+
+unsigned int max_freq = initial_max_freq;
+unsigned int starting_freq = initial_starting_freq;
+unsigned int freq_step = initial_freq_step;
+unsigned int min_Vz_freq;
+
 unsigned int counter = 0;
+unsigned int sweepNumber = 1;
 
 float Vz;
 float Vz_values[arraySize];
 float Vz_moving_avg[arraySize];
+float min_Vz_value;
 float data;     // Data to be sent to phone
 
 
@@ -67,14 +79,15 @@ void setup() {
 // ***
 void loop() {
   /***** For testing *****/
+/*
+  Serial.print("\n\nSweep ");
+  Serial.println(sweepNumber);
   
   for(freq = starting_freq; freq <= max_freq; freq += freq_step){
-    if (counter == 0) {delay(5000);}
-    
     writeddschip(freq);
-    delay(1000);
+    delay(50);
     readVoltages();
-
+    storeValues();
     serialPrintTable();
   }
 
@@ -84,11 +97,27 @@ void loop() {
   for (int i = 0; i < arraySize; i++){
     Serial.println(Vz_moving_avg[i], 4);
   }
+
+  Serial.print("\nMin freq: ");
+  Serial.print(min_Vz_freq);
+
+  starting_freq = min_Vz_freq - 3*freq_step;
+  max_freq = min_Vz_freq + 3*freq_step;
+  freq_step = freq_step / 2;
   
+  if(sweepNumber > 5) while(1);
   
-  //writeddschip(1000000);
-  
-  while(1);
+  sweepNumber++;
+  counter = 0;
+
+  */
+  Serial.println("Sending to phone");
+  sendEyePressureToPhone();
+  /*writeddschip(1000000);
+  readVoltages();
+  Serial.println(Vz, 4);*/
+  //Serial.println("Data sent to phone");
+  //while(1);
   
 } // end loop()
 
@@ -163,7 +192,7 @@ void writeddschip(unsigned long freq) {
 // *** Function to read the four voltages
 // ***
 void readVoltages() {
-  float numberOfSamples = 2000;
+  float numberOfSamples = 1000;
   Vz = 0;
   
   for (unsigned int i = 0; i < numberOfSamples; i++){
@@ -171,10 +200,29 @@ void readVoltages() {
   }
   
   Vz = Vz / numberOfSamples;
-  Vz_values[counter] = Vz * 3.3 / 1023.0; // Store calculated values in an array
   
-  counter++;
 } // end of readVoltages()
+
+
+
+// ***
+// *** Function to store necessary values in an array
+// ***
+void storeValues(){
+  Vz_values[counter] = Vz * 3.3 / 1023.0; // Store calculated values in an array
+  freq_values[counter] = freq;
+  
+  if (counter == 0){
+    min_Vz_value = Vz_values[counter];
+  }
+  
+  else if (Vz_values[counter] < min_Vz_value) {
+    min_Vz_value = Vz_values[counter];
+    min_Vz_freq = freq_values[counter];
+  }
+  //Vz = Vz * 3.3 / 1023.0;
+  counter++;
+}
 
 
 
@@ -194,7 +242,6 @@ void calculateMovingAverage(){
 
 
 
-
 // ***
 // *** Function to print the voltages
 // ***
@@ -211,9 +258,32 @@ void serialPrintTable(){
 // *** Function to send information to phone
 // ***
 void sendEyePressureToPhone(){
+  Serial.println("Setting mode");
+  ble.setMode(BLUEFRUIT_MODE_DATA);
+  Serial.println("Mode set");
+
+  Serial.println( "initializing" );
+  if ( !ble.begin(VERBOSE_MODE)){
+    Serial.println("error");
+  }
+  ble.verbose(false);
+
+  Serial.println("Checking for connection");
   while(! ble.isConnected()){
     delay(200); //wait for a phone to be connected
   }
-  ble.print("\n\nThe current eye pressure is: ");
-  ble.println(data);
+
+  Serial.println("Connected");
+  while(1){
+    ble.println(60);
+  }
+  
+  
+  
+  /*
+  for (int i = 0; i < arraySize; i++){
+    ble.println(Vz_moving_avg[i], 4);
+  }*/
+  //ble.print("\n\nThe current eye pressure is: ");
+  //ble.println(data);
 }
