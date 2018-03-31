@@ -53,6 +53,18 @@ void setup() {
   while (!Serial);  // make sure serial monitor is up
   delay(500);
 
+  // Set bluefruit to data mode
+  Serial.println("Setting mode Bluefruit");
+  ble.setMode(BLUEFRUIT_MODE_DATA);
+  Serial.println("Mode set");
+
+  // Initialize bluefruit
+  Serial.println( "Initializing Bluefruit" );
+  if ( !ble.begin(VERBOSE_MODE)){
+    Serial.println("error");
+  }
+  ble.verbose(false);
+
   Serial.begin(115200);
 
   // Voltage reading pins are INPUTs
@@ -79,7 +91,7 @@ void setup() {
 // ***
 void loop() {
   /***** For testing *****/
-/*
+
   Serial.print("\n\nSweep ");
   Serial.println(sweepNumber);
   
@@ -110,9 +122,9 @@ void loop() {
   sweepNumber++;
   counter = 0;
 
-  */
-  Serial.println("Sending to phone");
-  sendEyePressureToPhone();
+  
+  /*Serial.println("Sending to phone");
+  sendEyePressureToPhone();*/
   /*writeddschip(1000000);
   readVoltages();
   Serial.println(Vz, 4);*/
@@ -258,15 +270,7 @@ void serialPrintTable(){
 // *** Function to send information to phone
 // ***
 void sendEyePressureToPhone(){
-  Serial.println("Setting mode");
-  ble.setMode(BLUEFRUIT_MODE_DATA);
-  Serial.println("Mode set");
 
-  Serial.println( "initializing" );
-  if ( !ble.begin(VERBOSE_MODE)){
-    Serial.println("error");
-  }
-  ble.verbose(false);
 
   Serial.println("Checking for connection");
   while(! ble.isConnected()){
@@ -274,6 +278,7 @@ void sendEyePressureToPhone(){
   }
 
   Serial.println("Connected");
+  
   while(1){
     ble.println(60);
   }
