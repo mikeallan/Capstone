@@ -27,7 +27,6 @@ const unsigned int initial_freq_step = 100000;       // Minimum Frequency
 
 unsigned int freq = initial_starting_freq;
 const int arraySize = (initial_max_freq - initial_starting_freq) / (initial_freq_step) + 1;
-unsigned int freq_values[arraySize];
 
 unsigned int max_freq = initial_max_freq;
 unsigned int starting_freq = initial_starting_freq;
@@ -35,15 +34,16 @@ unsigned int freq_step = initial_freq_step;
 unsigned int final_freq_step = 1000;
 unsigned int min_Vz_freq;
 
-unsigned int counter = 0;
 unsigned int sweepNumber = 1;
-unsigned int numberOfSweeps = 5;
+const unsigned int numberOfSweeps = 5;
 
+unsigned int freq_values[arraySize][numberOfSweeps];
 float Vz;
-float Vz_values[arraySize];
-float Vz_moving_avg[arraySize];
+float Vz_values[arraySize][numberOfSweeps];
+float Vz_moving_avg[arraySize][numberOfSweeps];
 float min_Vz_value;
 float data;     // Data to be sent to phone
+unsigned int counter[numberOfSweeps] = {0};
 
 
 
@@ -109,7 +109,7 @@ void loop() {
   calculateMovingAverage();
 
   for (int i = 0; i < arraySize; i++){
-    Serial.println(Vz_moving_avg[i], 4);
+    Serial.println(Vz_moving_avg[i][sweepNumber - 1], 4);
   }
 
   Serial.print("\nMin freq: ");
@@ -128,7 +128,6 @@ void loop() {
   if(sweepNumber > numberOfSweeps) while(1);
   
   sweepNumber++;
-  counter = 0;
 
   
   /*Serial.println("Sending to phone");
@@ -229,19 +228,19 @@ void readVoltages() {
 // *** Function to store necessary values in an array
 // ***
 void storeValues(){
-  Vz_values[counter] = Vz * 3.3 / 1023.0; // Store calculated values in an array
-  freq_values[counter] = freq;
+  Vz_values[counter[sweepNumber - 1]][sweepNumber - 1] = Vz * 3.3 / 1023.0; // Store calculated values in an array
+  freq_values[counter[sweepNumber - 1]][sweepNumber - 1] = freq;
   
-  if (counter == 0){
-    min_Vz_value = Vz_values[counter];
+  if (counter[sweepNumber - 1] == 0){
+    min_Vz_value = Vz_values[counter[sweepNumber - 1]][sweepNumber - 1];
   }
   
-  else if (Vz_values[counter] < min_Vz_value) {
-    min_Vz_value = Vz_values[counter];
-    min_Vz_freq = freq_values[counter];
+  else if (Vz_values[counter[sweepNumber - 1]][sweepNumber - 1] < min_Vz_value) {
+    min_Vz_value = Vz_values[counter[sweepNumber - 1]][sweepNumber - 1];
+    min_Vz_freq = freq_values[counter[sweepNumber - 1]][sweepNumber - 1];
   }
   
-  counter++;
+  counter[sweepNumber - 1]++;
 }
 
 
@@ -251,12 +250,12 @@ void storeValues(){
 // *** Function to calculate the moving average of Vz
 // ***
 void calculateMovingAverage(){
-  Vz_moving_avg[0] = Vz_values[0];
-  Vz_moving_avg[1] = Vz_values[1];
-  Vz_moving_avg[arraySize-1] = Vz_values[arraySize-1];
-  Vz_moving_avg[arraySize-2] = Vz_values[arraySize-2];
+  Vz_moving_avg[0][sweepNumber - 1] = Vz_values[0][sweepNumber - 1];
+  Vz_moving_avg[1][sweepNumber - 1] = Vz_values[1][sweepNumber - 1];
+  Vz_moving_avg[arraySize-1][sweepNumber - 1] = Vz_values[arraySize-1][sweepNumber - 1];
+  Vz_moving_avg[arraySize-2][sweepNumber - 1] = Vz_values[arraySize-2][sweepNumber - 1];
   for (int i = 2; i < arraySize - 2; i++){
-    Vz_moving_avg[i] = (Vz_values[i+2] + Vz_values[i+1] + Vz_values[i-2] + Vz_values[i-1] + Vz_values[i]) / 5;
+    Vz_moving_avg[i][sweepNumber - 1] = (Vz_values[i+2][sweepNumber - 1] + Vz_values[i+1][sweepNumber - 1] + Vz_values[i-2][sweepNumber - 1] + Vz_values[i-1][sweepNumber - 1] + Vz_values[i][sweepNumber - 1]) / 5;
   }
 } // end of calculateMovingAverage()
 
@@ -268,9 +267,22 @@ void calculateMovingAverage(){
 void serialPrintTable(){
   Serial.print(freq);
   Serial.print("   ");
-  Serial.println(Vz_values[counter-1], 4);
+  Serial.println(Vz_values[counter[sweepNumber - 1]-1][sweepNumber - 1], 4);
 } // end of printTable()
 
+
+
+
+// ***
+// *** Function to send information to phone
+// ***
+void serialPrintAllSweeps(){
+  for (int i = 0; i < numberOfSweeps; i++){
+    Serial.print(freq);
+    Serial.print("   ");
+    Serial.println(Vz_values[counter[sweepNumber - 1]-1][sweepNumber - 1], 4);
+  }
+}
 
 
 
