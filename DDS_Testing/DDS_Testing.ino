@@ -32,10 +32,12 @@ unsigned int freq_values[arraySize];
 unsigned int max_freq = initial_max_freq;
 unsigned int starting_freq = initial_starting_freq;
 unsigned int freq_step = initial_freq_step;
+unsigned int final_freq_step = 1000;
 unsigned int min_Vz_freq;
 
 unsigned int counter = 0;
 unsigned int sweepNumber = 1;
+unsigned int numberOfSweeps = 5;
 
 float Vz;
 float Vz_values[arraySize];
@@ -102,7 +104,7 @@ void loop() {
     storeValues();
     serialPrintTable();
   }
-
+  
   Serial.println("\nMoving averages");
   calculateMovingAverage();
 
@@ -111,13 +113,19 @@ void loop() {
   }
 
   Serial.print("\nMin freq: ");
-  Serial.print(min_Vz_freq);
+  Serial.println(min_Vz_freq);
 
-  starting_freq = min_Vz_freq - 3*freq_step;
-  max_freq = min_Vz_freq + 3*freq_step;
-  freq_step = freq_step / 2;
+  if(sweepNumber < numberOfSweeps - 1){
+    starting_freq = min_Vz_freq - 3*freq_step;
+    max_freq = min_Vz_freq + 3*freq_step;
+    freq_step = freq_step / 2;
+  }
+
+  if(sweepNumber = numberOfSweeps - 1){
+    freq_step = final_freq_step;
+  }
   
-  if(sweepNumber > 5) while(1);
+  if(sweepNumber > numberOfSweeps) while(1);
   
   sweepNumber++;
   counter = 0;
@@ -232,7 +240,7 @@ void storeValues(){
     min_Vz_value = Vz_values[counter];
     min_Vz_freq = freq_values[counter];
   }
-  //Vz = Vz * 3.3 / 1023.0;
+  
   counter++;
 }
 
