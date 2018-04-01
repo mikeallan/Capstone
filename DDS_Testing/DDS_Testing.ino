@@ -22,10 +22,10 @@ Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_
 // Variable declaration
 
 // Need to be const for array size declaration
-const unsigned int initial_starting_freq = 900000;  // Starting Frequency
-const unsigned int initial_max_freq = 3000000;       // Max Frequency
+const unsigned int initial_starting_freq = 1400000;  // Starting Frequency
+const unsigned int initial_max_freq = 2300000;       // Max Frequency
 const unsigned int initial_freq_step = 100000;       // Minimum Frequency
-unsigned int final_freq_step = 20000;
+unsigned int final_freq_step = 50000;
 
 unsigned int freq = initial_starting_freq;
 const int arraySize = 50; //(initial_max_freq - initial_starting_freq) / (initial_freq_step) + 1;
@@ -38,8 +38,10 @@ unsigned int min_Vz_freq;
 int mode = LOW;
 unsigned int myIndex;
 unsigned int sweepNumber = 1;
-const unsigned int numberOfSweeps = 4;
+const unsigned int numberOfSweeps = 3;
 unsigned int buttonPressNumber = 1;
+bool flag = HIGH;
+bool dataCanBeSent = LOW;
 
 unsigned int freq_values[arraySize][numberOfSweeps + 1];
 float Vz;
@@ -49,8 +51,8 @@ float min_Vz_value;
 float data;     // Data to be sent to phone
 unsigned int counter[numberOfSweeps + 1] = {0};
 unsigned int lastCounter[numberOfSweeps + 1] = {0};
-bool flag = HIGH;
-bool dataCanBeSent = LOW;
+float interpolatedArray[arraySize*100];
+
 
 
 // ***
@@ -110,7 +112,10 @@ void loop() {
     mode = HIGH; 
     dataCanBeSent = LOW;
   }
-  if(digitalRead(left_button_pin) == LOW && dataCanBeSent) { sendDataToPhone(); }
+  if(digitalRead(left_button_pin) == LOW && dataCanBeSent) { 
+    addDataPoints();
+    sendDataToPhone(); 
+  }
 
   if(mode){
     Serial.print("\nSweep ");
@@ -141,7 +146,7 @@ void loop() {
     sweepNumber++;
     
     if(sweepNumber > numberOfSweeps) {
-      serialPrintAllSweeps();
+      //serialPrintAllSweeps();
       Serial.println("\n\nDone");
       flag = HIGH;
       mode = LOW;
@@ -297,6 +302,33 @@ void serialPrintAllSweeps(){
 
 
 // ***
+// *** Function to linearly interpolate between values
+// ***
+void addDataPoints(){
+  for (int i = 0; i < lastCounter[numberOfSweeps - 2] - 1; i++){
+    for (int j = 0; j < 100; j++){
+      interpolatedArray[100*i+j] = Vz_values[i][numberOfSweeps - 2] +
+            (Vz_values[i][numberOfSweeps - 2] - Vz_values[i+1][numberOfSweeps - 2])/((float)j+1.0);
+    }
+  }
+
+  for (int i = 0; i < lastCounter[numberOfSweeps - 2] - 1; i++){
+    interpolatedArray[100*i] = interpolatedArray[100*i - 1];
+  }
+  
+  for (int i = 0; i < lastCounter[numberOfSweeps - 2] - 1; i++){
+    for (int j = 0; j < 100; j++){
+      Serial.print(100*i+j);
+      Serial.print("   ");
+      Serial.println(interpolatedArray[100*i+j], 4/*interpolatedArray[j*i+j]*/);
+    }
+  }
+}
+
+
+
+
+// ***
 // *** Function to send information to phone
 // ***
 void sendDataToPhone(){
@@ -308,23 +340,21 @@ void sendDataToPhone(){
   }
 
   Serial.println("Connected");
-  
-  //ble.println(60);
-  
+
   //for (int i = 0; i < 1/*numberOfSweeps*/; i++){ 
-  int i = 2;   
-    for (int j = 0; j < lastCounter[i]; j++){
+/*  int i = 2;   
+    for (int j = 0; j < lastCounter[i] * 100; j++){
+      ble.println(interpolatedArray[j], 4);
       for (int k = 0; k < 25; k++){
         ble.println(Vz_values[j][i], 4);
       }
-  //  }
+    }*/
+
+  for (int i = 0; i < lastCounter[numberOfSweeps - 2] - 1; i++){
+    for (int j = 0; j < 100; j++){
+      ble.println(interpolatedArray[100*i+j], 4/*interpolatedArray[j*i+j]*/);
+    }
   }
   
   delay(300);
-  /*
-  for (int i = 0; i < arraySize; i++){
-    ble.println(Vz_moving_avg[i], 4);
-  }*/
-  //ble.print("\n\nThe current eye pressure is: ");
-  //ble.println(data);
 }
