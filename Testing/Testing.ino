@@ -111,11 +111,11 @@ void loop(void)
 
 //  x = x+0.001;
   ble.println();  //print newline so app knows to plot the values
-}
 
 
 
-  /*
+
+  
   // Check for user input
   char inputs[BUFSIZE+1];
 
@@ -149,7 +149,7 @@ void loop(void)
 /**********************************************************
   Checks for user input (via the Serial Monitor)
 **********************************************************/
-/*
+
 bool getUserInput(char buffer[], uint8_t maxSize)
 {
   // timeout in 100 milliseconds
@@ -169,4 +169,4 @@ bool getUserInput(char buffer[], uint8_t maxSize)
   } while( (count < maxSize) && (Serial.available()) );
 
   return true;
-}*/
+}

@@ -17,7 +17,15 @@
 #define dds_W_CLK_pin 11 // Loads one bit, W_CLK - pin 7 on dds
 #define dds_FQ_UD_pin 12 // Shifts register, FQ_UD - pin 8 on dds
 
+#define FACTORYRESET_ENABLE         1
+
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
+
+// A small helper
+void error(const __FlashStringHelper*err) {
+  Serial.println(err);
+  while (1);
+}
 
 // Variable declaration
 
@@ -55,26 +63,41 @@ float interpolatedArray[arraySize*100];
 float slope = 0;
 
 
-
 // ***
 // *** Setup function
 // ***
 void setup() {
-  while (!Serial);  // make sure serial monitor is up
+  while (!Serial);  // required for Flora & Micro
   delay(500);
 
-  // Set bluefruit to data mode
-  ble.setMode(BLUEFRUIT_MODE_DATA);
-  Serial.println("Bluefruit in Data Mode");
-
-  // Initialize bluefruit
-  if ( !ble.begin(VERBOSE_MODE)){
-    Serial.println("error");
-  }
-  Serial.println( "Bluefruit Initialized" );
-  ble.verbose(false);
-
   Serial.begin(115200);
+  Serial.println(F("Adafruit Bluefruit Command Mode Example"));
+  Serial.println(F("---------------------------------------"));
+
+  // Initialise the module
+  Serial.print(F("Initialising the Bluefruit LE module: "));
+
+  if ( !ble.begin(VERBOSE_MODE) )
+  {
+    error(F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
+  }
+  Serial.println( F("OK!") );
+
+  if ( FACTORYRESET_ENABLE )
+  {
+    // Perform a factory reset to make sure everything is in a known state
+    Serial.println(F("Performing a factory reset: "));
+    if ( ! ble.factoryReset() ){
+      error(F("Couldn't factory reset"));
+    }
+  }
+
+  /* Disable command echo from Bluefruit */
+  ble.echo(false);
+
+  Serial.println("Finished set up");
+
+  ble.verbose(false);  // debug info is a little annoying after this point!
 
   // Voltage reading pins are INPUTs
   pinMode(Vz_pin, INPUT);
@@ -87,15 +110,10 @@ void setup() {
   pinMode(dds_W_CLK_pin, OUTPUT);
   pinMode(dds_FQ_UD_pin, OUTPUT);
 
-  /*// Print the start of the table
-  Serial.print(" Freq ");
-  Serial.print("      ");
-  Serial.println("Vz");*/
-
-  init_dds();
-  // Send it an initial value 
-  writeddschip(freq);
+  init_dds(); // Initialize dds chip
+  writeddschip(freq);// Send it an initial value 
 } // end setup()
+
 
 
 
@@ -103,7 +121,9 @@ void setup() {
 // *** Main loop function
 // ***
 void loop() {
-  /***** For testing *****/
+
+  userInput();
+  
   if(digitalRead(right_button_pin) == LOW && flag) { 
     Serial.print("\nRight button engaged. Run number "); 
     Serial.println(buttonPressNumber);
@@ -254,8 +274,9 @@ void readVoltages() {
 // *** Function to store necessary values in an array
 // ***
 void storeValues(){
-  
-  Vz_values[counter[sweepNumber - 1]][sweepNumber - 1] = Vz * 3.3 / 1023.0; // Store calculated values in an array
+
+  // Store calculated values in an array
+  Vz_values[counter[sweepNumber - 1]][sweepNumber - 1] = Vz * 3.3 / 1023.0; 
   freq_values[counter[sweepNumber - 1]][sweepNumber - 1] = freq;
   
   if (counter[sweepNumber - 1] == 0){
@@ -309,7 +330,6 @@ void addDataPoints(){
   
   for (int i = 0; i < lastCounter[numberOfSweeps - 2] - 1; i++){
     slope = Vz_values[i+1][numberOfSweeps - 2] - Vz_values[i][numberOfSweeps - 2];
-    Serial.println(slope);
     for (int j = 0; j < 100; j++){
       interpolatedArray[100*i+j] = Vz_values[i][numberOfSweeps - 2] +
             slope*((float)j)/(100.0);
@@ -325,8 +345,12 @@ void addDataPoints(){
 // ***
 void sendDataToPhone(){
 
+  // Set bluefruit to data mode
+  ble.setMode(BLUEFRUIT_MODE_DATA);
+  Serial.println("Bluefruit in Data Mode");
+
   // Send graph of whole sweep
-  Serial.println("Checking for connection");
+  Serial.println("\nChecking for connection");
   while(! ble.isConnected()){
     delay(200); //wait for a phone to be connected
   }
@@ -344,9 +368,73 @@ void sendDataToPhone(){
 
   for (int i = 0; i < lastCounter[numberOfSweeps - 2] - 1; i++){
     for (int j = 0; j < 100; j++){
-      ble.println(interpolatedArray[100*i+j], 4/*interpolatedArray[j*i+j]*/);
+      ble.println(interpolatedArray[100*i+j], 4);
     }
   }
   
   delay(300);
+  ble.setMode(BLUEFRUIT_MODE_COMMAND);
+} // end sendDataToPhone()
+
+
+
+
+/// ***
+/// *** function to send & receive data - stock function
+/// ***
+void userInput(){
+    // Check for user input
+  char inputs[BUFSIZE+1];
+
+  if ( getUserInput(inputs, BUFSIZE) )
+  {
+    // Send characters to Bluefruit
+    Serial.print("[Send] ");
+    Serial.println(inputs);
+
+    ble.print("AT+BLEUARTTX=");
+    ble.println(inputs);
+
+    // check response stastus
+    if (! ble.waitForOK() ) {
+      Serial.println(F("Failed to send?"));
+    }
+  }
+
+  // Check for incoming characters from Bluefruit
+  ble.println("AT+BLEUARTRX");
+  ble.readline();
+  if (strcmp(ble.buffer, "OK") == 0) {
+    // no data
+    return;
+  }
+  // Some data was found, its in the buffer
+  Serial.print(F("[Recv] ")); Serial.println(ble.buffer);
+  ble.waitForOK();
+} // end userInputWait()
+
+
+
+/// ***
+/// *** Function to get the user input
+/// ***
+bool getUserInput(char buffer[], uint8_t maxSize)
+{
+  // timeout in 100 milliseconds
+  TimeoutTimer timeout(100);
+
+  memset(buffer, 0, maxSize);
+  while( (!Serial.available()) && !timeout.expired() ) { delay(1); }
+
+  if ( timeout.expired() ) return false;
+
+  delay(2);
+  uint8_t count=0;
+  do
+  {
+    count += Serial.readBytes(buffer+count, maxSize);
+    delay(2);
+  } while( (count < maxSize) && (Serial.available()) );
+
+  return true;
 }
