@@ -38,16 +38,16 @@ unsigned int min_Vz_freq;
 int mode = LOW;
 unsigned int myIndex;
 unsigned int sweepNumber = 1;
-const unsigned int numberOfSweeps = 1;
+const unsigned int numberOfSweeps = 5;
 
-unsigned int freq_values[arraySize][numberOfSweeps];
+unsigned int freq_values[arraySize][numberOfSweeps + 1];
 float Vz;
-float Vz_values[arraySize][numberOfSweeps];
-float Vz_moving_avg[arraySize][numberOfSweeps];
+float Vz_values[arraySize][numberOfSweeps + 1];
+float Vz_moving_avg[arraySize][numberOfSweeps + 1];
 float min_Vz_value;
 float data;     // Data to be sent to phone
-unsigned int counter[numberOfSweeps] = {0};
-unsigned int sweepSize[numberOfSweeps] = {0};
+unsigned int counter[numberOfSweeps + 1] = {0};
+unsigned int sweepSize[numberOfSweeps + 1] = {0};
 
 
 // ***
@@ -58,15 +58,14 @@ void setup() {
   delay(500);
 
   // Set bluefruit to data mode
-  Serial.println("Setting mode Bluefruit");
   ble.setMode(BLUEFRUIT_MODE_DATA);
-  Serial.println("Mode set");
+  Serial.println("Bluefruit in Data Mode");
 
   // Initialize bluefruit
-  Serial.println( "Initializing Bluefruit" );
   if ( !ble.begin(VERBOSE_MODE)){
     Serial.println("error");
   }
+  Serial.println( "Bluefruit Initialized" );
   ble.verbose(false);
 
   Serial.begin(115200);
@@ -82,10 +81,10 @@ void setup() {
   pinMode(dds_W_CLK_pin, OUTPUT);
   pinMode(dds_FQ_UD_pin, OUTPUT);
 
-  // Print the start of the table
+  /*// Print the start of the table
   Serial.print(" Freq ");
   Serial.print("      ");
-  Serial.println("Vz");
+  Serial.println("Vz");*/
 
   init_dds();
 } // end setup()
@@ -97,7 +96,6 @@ void setup() {
 // ***
 void loop() {
   /***** For testing *****/
-  Serial.println(mode);
   if(digitalRead(right_button_pin) == LOW) { 
     Serial.println("Right button engaged"); 
     pinMode(right_button_pin, INPUT);
@@ -109,10 +107,8 @@ void loop() {
   if(mode){
     Serial.print("\n\nSweep ");
     Serial.println(sweepNumber);
-    
     for(freq = starting_freq; freq <= max_freq; freq += freq_step){
       writeddschip(freq);
-      Serial.println(min_Vz_freq);
       delay(50);
       readVoltages();
       storeValues();
@@ -145,16 +141,19 @@ void loop() {
       freq_step = final_freq_step;
     }
     
+    sweepNumber++;
+    
     if(sweepNumber > numberOfSweeps) {
       Serial.println("Done");
       mode = LOW;
       pinMode(right_button_pin, INPUT_PULLUP);
       pinMode(left_button_pin, INPUT_PULLUP);
+      sweepNumber = 1;
+      for (int i = 0; i < numberOfSweeps; i++) {
+        counter[i] = 0;
+      }
     }
-    
-    sweepNumber++;
   }
-  
 } // end loop()
 
 
