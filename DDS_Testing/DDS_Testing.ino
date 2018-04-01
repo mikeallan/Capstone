@@ -52,6 +52,7 @@ float data;     // Data to be sent to phone
 unsigned int counter[numberOfSweeps + 1] = {0};
 unsigned int lastCounter[numberOfSweeps + 1] = {0};
 float interpolatedArray[arraySize*100];
+float slope = 0;
 
 
 
@@ -305,22 +306,13 @@ void serialPrintAllSweeps(){
 // *** Function to linearly interpolate between values
 // ***
 void addDataPoints(){
-  for (int i = 0; i < lastCounter[numberOfSweeps - 2] - 1; i++){
-    for (int j = 0; j < 100; j++){
-      interpolatedArray[100*i+j] = Vz_values[i][numberOfSweeps - 2] +
-            (Vz_values[i][numberOfSweeps - 2] - Vz_values[i+1][numberOfSweeps - 2])/((float)j+1.0);
-    }
-  }
-
-  for (int i = 0; i < lastCounter[numberOfSweeps - 2] - 1; i++){
-    interpolatedArray[100*i] = interpolatedArray[100*i - 1];
-  }
   
   for (int i = 0; i < lastCounter[numberOfSweeps - 2] - 1; i++){
+    slope = Vz_values[i+1][numberOfSweeps - 2] - Vz_values[i][numberOfSweeps - 2];
+    Serial.println(slope);
     for (int j = 0; j < 100; j++){
-      Serial.print(100*i+j);
-      Serial.print("   ");
-      Serial.println(interpolatedArray[100*i+j], 4/*interpolatedArray[j*i+j]*/);
+      interpolatedArray[100*i+j] = Vz_values[i][numberOfSweeps - 2] +
+            slope*((float)j)/(100.0);
     }
   }
 }
