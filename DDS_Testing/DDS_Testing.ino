@@ -38,7 +38,7 @@ unsigned int min_Vz_freq;
 int mode = LOW;
 unsigned int myIndex;
 unsigned int sweepNumber = 1;
-const unsigned int numberOfSweeps = 5;
+const unsigned int numberOfSweeps = 1;
 
 unsigned int freq_values[arraySize][numberOfSweeps];
 float Vz;
@@ -97,7 +97,7 @@ void setup() {
 // ***
 void loop() {
   /***** For testing *****/
-
+  Serial.println(mode);
   if(digitalRead(right_button_pin) == LOW) { 
     Serial.println("Right button engaged"); 
     pinMode(right_button_pin, INPUT);
@@ -112,6 +112,7 @@ void loop() {
     
     for(freq = starting_freq; freq <= max_freq; freq += freq_step){
       writeddschip(freq);
+      Serial.println(min_Vz_freq);
       delay(50);
       readVoltages();
       storeValues();
@@ -133,9 +134,11 @@ void loop() {
     Serial.println(min_Vz_freq);
   
     if(sweepNumber < numberOfSweeps - 1){
-      starting_freq = min_Vz_freq - 3*freq_step;
-      max_freq = min_Vz_freq + 3*freq_step;
-      freq_step = freq_step / 2;
+      if(min_Vz_freq != 0) { 
+        starting_freq = min_Vz_freq - 3*freq_step;
+        max_freq = min_Vz_freq + 3*freq_step;
+        freq_step = freq_step / 2;
+      }
     }
   
     if(sweepNumber == numberOfSweeps - 1){
@@ -143,6 +146,7 @@ void loop() {
     }
     
     if(sweepNumber > numberOfSweeps) {
+      Serial.println("Done");
       mode = LOW;
       pinMode(right_button_pin, INPUT_PULLUP);
       pinMode(left_button_pin, INPUT_PULLUP);
