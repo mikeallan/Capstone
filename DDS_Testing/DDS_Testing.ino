@@ -30,10 +30,10 @@ void error(const __FlashStringHelper*err) {
 // Variable declaration
 
 // Need to be const for array size declaration
-const unsigned int initial_starting_freq = 1400000;  // Starting Frequency
-const unsigned int initial_max_freq = 2300000;       // Max Frequency
+const unsigned int initial_starting_freq = 800000;  // Starting Frequency
+const unsigned int initial_max_freq = 3000000;       // Max Frequency
 const unsigned int initial_freq_step = 100000;       // Minimum Frequency
-unsigned int final_freq_step = 50000;
+unsigned int final_freq_step = 20000;
 
 unsigned int freq = initial_starting_freq;
 const int arraySize = 50; //(initial_max_freq - initial_starting_freq) / (initial_freq_step) + 1;
@@ -46,7 +46,7 @@ unsigned int min_Vz_freq;
 int mode = LOW;
 unsigned int myIndex;
 unsigned int sweepNumber = 1;
-const unsigned int numberOfSweeps = 3;
+const unsigned int numberOfSweeps = 4;
 unsigned int buttonPressNumber = 1;
 bool flag = HIGH;
 bool dataCanBeSent = LOW;
@@ -61,6 +61,8 @@ unsigned int counter[numberOfSweeps + 1] = {0};
 unsigned int lastCounter[numberOfSweeps + 1] = {0};
 float interpolatedArray[arraySize*100];
 float slope = 0;
+unsigned int sweepToPrint;
+unsigned long finishTime;
 
 
 // ***
@@ -138,8 +140,9 @@ void loop() {
   //userInput();
   
   if(digitalRead(right_button_pin) == LOW && flag) { 
-    Serial.print("\nRight button engaged. Run number "); 
-    Serial.println(buttonPressNumber);
+    ble.print("\nRight button engaged. \n\nRun number "); 
+    ble.println(buttonPressNumber);
+    ble.print("\n");
     pinMode(right_button_pin, INPUT);
     pinMode(left_button_pin, INPUT);
     flag = LOW;
@@ -147,6 +150,22 @@ void loop() {
     dataCanBeSent = LOW;
   }
   if(digitalRead(left_button_pin) == LOW && dataCanBeSent) { 
+    sweepToPrint = 0;
+
+    // Give the user 3 seconds to input sweep number they want to see
+    finishTime = millis() + 3000;
+    
+    while (finishTime > millis()){
+      delay(200); // for debouncing
+      if(digitalRead(left_button_pin) == LOW){
+        if (sweepToPrint < numberOfSweeps){
+          sweepToPrint++;
+        }
+      }
+    }
+    
+    Serial.print("Printing sweep ");
+    Serial.println(sweepToPrint);
     addDataPoints();
     sendDataToPhone(); 
   }
@@ -168,7 +187,7 @@ void loop() {
       //serialPrintTable();
     }
   
-    ble.print("Minimum frequency = ");
+    ble.print("Resonance frequency = ");
     ble.println(min_Vz_freq);
     ble.print("\n");
   
@@ -348,10 +367,10 @@ void serialPrintAllSweeps(){
 // ***
 void addDataPoints(){
   
-  for (int i = 0; i < lastCounter[numberOfSweeps - 2] - 1; i++){
-    slope = Vz_values[i+1][numberOfSweeps - 2] - Vz_values[i][numberOfSweeps - 2];
+  for (int i = 0; i < lastCounter[sweepToPrint] - 1; i++){
+    slope = Vz_values[i+1][sweepToPrint] - Vz_values[i][sweepToPrint];
     for (int j = 0; j < 100; j++){
-      interpolatedArray[100*i+j] = Vz_values[i][numberOfSweeps - 2] +
+      interpolatedArray[100*i+j] = Vz_values[i][sweepToPrint] +
             slope*((float)j)/(100.0);
     }
   }
@@ -364,13 +383,6 @@ void addDataPoints(){
 // *** Function to send information to phone
 // ***
 void sendDataToPhone(){
-
-  // Set bluefruit to data mode
-  ble.setMode(BLUEFRUIT_MODE_DATA);
-  Serial.println("Bluefruit in Data Mode");
-
-  
-
   //for (int i = 0; i < 1/*numberOfSweeps*/; i++){ 
 /*  int i = 2;   
     for (int j = 0; j < lastCounter[i] * 100; j++){
@@ -380,9 +392,10 @@ void sendDataToPhone(){
       }
     }*/
 
-  for (int i = 0; i < lastCounter[numberOfSweeps - 2] - 1; i++){
+  for (int i = 0; i < lastCounter[sweepToPrint] - 1; i++){
     for (int j = 0; j < 100; j++){
       ble.println(interpolatedArray[100*i+j], 4);
+      delayMicroseconds(10);
     }
   }
   
