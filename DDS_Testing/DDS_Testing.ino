@@ -99,6 +99,19 @@ void setup() {
 
   ble.verbose(false);  // debug info is a little annoying after this point!
 
+
+  // Send graph of whole sweep
+  Serial.println("\nChecking for connection");
+  while(! ble.isConnected()){
+    delay(200); //wait for a phone to be connected
+  }
+  Serial.println("Connected");
+
+  // Set bluefruit to data mode
+  ble.setMode(BLUEFRUIT_MODE_DATA);
+  Serial.println("Bluefruit in Data Mode");
+  
+
   // Voltage reading pins are INPUTs
   pinMode(Vz_pin, INPUT);
   pinMode(left_button_pin, INPUT_PULLUP);
@@ -122,7 +135,7 @@ void setup() {
 // ***
 void loop() {
 
-  userInput();
+  //userInput();
   
   if(digitalRead(right_button_pin) == LOW && flag) { 
     Serial.print("\nRight button engaged. Run number "); 
@@ -137,10 +150,16 @@ void loop() {
     addDataPoints();
     sendDataToPhone(); 
   }
-
+  
   if(mode){
-    Serial.print("\nSweep ");
-    Serial.print(sweepNumber);
+    ble.print("Sweep ");
+    ble.println(sweepNumber);
+    ble.print("Starting Frequency: ");
+    ble.println(starting_freq);
+    ble.print("Max Frequency: ");
+    ble.println(max_freq);
+    ble.print("Frequency step: ");
+    ble.println(freq_step);
     for(freq = starting_freq; freq <= max_freq; freq += freq_step){
       writeddschip(freq);
       delay(50);
@@ -149,8 +168,9 @@ void loop() {
       //serialPrintTable();
     }
   
-    Serial.print(" - minimum frequency = ");
-    Serial.println(min_Vz_freq);
+    ble.print("Minimum frequency = ");
+    ble.println(min_Vz_freq);
+    ble.print("\n");
   
     if(sweepNumber < numberOfSweeps - 1){
       if(min_Vz_freq != 0) { 
@@ -168,7 +188,7 @@ void loop() {
     
     if(sweepNumber > numberOfSweeps) {
       //serialPrintAllSweeps();
-      Serial.println("\n\nDone");
+      ble.println("\n\nDone");
       flag = HIGH;
       mode = LOW;
       pinMode(right_button_pin, INPUT_PULLUP);
@@ -349,13 +369,7 @@ void sendDataToPhone(){
   ble.setMode(BLUEFRUIT_MODE_DATA);
   Serial.println("Bluefruit in Data Mode");
 
-  // Send graph of whole sweep
-  Serial.println("\nChecking for connection");
-  while(! ble.isConnected()){
-    delay(200); //wait for a phone to be connected
-  }
-
-  Serial.println("Connected");
+  
 
   //for (int i = 0; i < 1/*numberOfSweeps*/; i++){ 
 /*  int i = 2;   
@@ -373,12 +387,12 @@ void sendDataToPhone(){
   }
   
   delay(300);
-  ble.setMode(BLUEFRUIT_MODE_COMMAND);
+  //ble.setMode(BLUEFRUIT_MODE_COMMAND);
 } // end sendDataToPhone()
 
 
 
-
+/*
 /// ***
 /// *** function to send & receive data - stock function
 /// ***
@@ -415,6 +429,7 @@ void userInput(){
 
 
 
+
 /// ***
 /// *** Function to get the user input
 /// ***
@@ -437,4 +452,4 @@ bool getUserInput(char buffer[], uint8_t maxSize)
   } while( (count < maxSize) && (Serial.available()) );
 
   return true;
-}
+}*/
