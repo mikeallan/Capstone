@@ -10,7 +10,8 @@
 
 // Pin assignment
 #define Vz_pin A2
-
+#define right_button_pin A3
+#define left_button_pin A4
 #define dds_RESET_pin 6 // dds reset pin - pin 22 on dds
 #define dds_DATA_pin 10 // Serial bit sent to dds - pin 25 on dds
 #define dds_W_CLK_pin 11 // Loads one bit, W_CLK - pin 7 on dds
@@ -22,8 +23,9 @@ Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_
 
 // Need to be const for array size declaration
 const unsigned int initial_starting_freq = 750000;  // Starting Frequency
-const unsigned int initial_max_freq = 2000000;       // Max Frequency
+const unsigned int initial_max_freq = 3000000;       // Max Frequency
 const unsigned int initial_freq_step = 100000;       // Minimum Frequency
+unsigned int final_freq_step = 5000;
 
 unsigned int freq = initial_starting_freq;
 const int arraySize = (initial_max_freq - initial_starting_freq) / (initial_freq_step) + 1;
@@ -31,9 +33,10 @@ const int arraySize = (initial_max_freq - initial_starting_freq) / (initial_freq
 unsigned int max_freq = initial_max_freq;
 unsigned int starting_freq = initial_starting_freq;
 unsigned int freq_step = initial_freq_step;
-unsigned int final_freq_step = 1000;
 unsigned int min_Vz_freq;
 
+int mode = LOW;
+unsigned int myIndex;
 unsigned int sweepNumber = 1;
 const unsigned int numberOfSweeps = 5;
 
@@ -44,8 +47,7 @@ float Vz_moving_avg[arraySize][numberOfSweeps];
 float min_Vz_value;
 float data;     // Data to be sent to phone
 unsigned int counter[numberOfSweeps] = {0};
-
-
+unsigned int sweepSize[numberOfSweeps] = {0};
 
 
 // ***
@@ -71,6 +73,8 @@ void setup() {
 
   // Voltage reading pins are INPUTs
   pinMode(Vz_pin, INPUT);
+  pinMode(left_button_pin, INPUT_PULLUP);
+  pinMode(right_button_pin, INPUT_PULLUP);
 
   // dds pins are OUTPUTs
   pinMode(dds_RESET_pin, OUTPUT);
@@ -94,49 +98,58 @@ void setup() {
 void loop() {
   /***** For testing *****/
 
-  Serial.print("\n\nSweep ");
-  Serial.println(sweepNumber);
-  
-  for(freq = starting_freq; freq <= max_freq; freq += freq_step){
-    writeddschip(freq);
-    delay(50);
-    readVoltages();
-    storeValues();
-    serialPrintTable();
+  if(digitalRead(right_button_pin) == LOW) { 
+    Serial.println("Right button engaged"); 
+    pinMode(right_button_pin, INPUT);
+    pinMode(left_button_pin, INPUT);
+    mode = HIGH; 
   }
-  
-  Serial.println("\nMoving averages");
-  calculateMovingAverage();
+  //if(digitalRead(right_button_pin) == LOW) { sendDataToPhone(); }
 
-  for (int i = 0; i < arraySize; i++){
-    Serial.println(Vz_moving_avg[i][sweepNumber - 1], 4);
+  if(mode){
+    Serial.print("\n\nSweep ");
+    Serial.println(sweepNumber);
+    
+    for(freq = starting_freq; freq <= max_freq; freq += freq_step){
+      writeddschip(freq);
+      delay(50);
+      readVoltages();
+      storeValues();
+      serialPrintTable();
+    }
+  
+    //sweepSize[sweepNumber] = counter[sweepNumber - 1] -1;
+  
+    if (sweepNumber == 1){
+      Serial.println("\nMoving averages");
+      calculateMovingAverage();
+  
+      for (int i = 0; i < arraySize; i++){
+        Serial.println(Vz_moving_avg[i][sweepNumber - 1], 4);
+      }
+    }
+    
+    Serial.print("\nMin freq: ");
+    Serial.println(min_Vz_freq);
+  
+    if(sweepNumber < numberOfSweeps - 1){
+      starting_freq = min_Vz_freq - 3*freq_step;
+      max_freq = min_Vz_freq + 3*freq_step;
+      freq_step = freq_step / 2;
+    }
+  
+    if(sweepNumber == numberOfSweeps - 1){
+      freq_step = final_freq_step;
+    }
+    
+    if(sweepNumber > numberOfSweeps) {
+      mode = LOW;
+      pinMode(right_button_pin, INPUT_PULLUP);
+      pinMode(left_button_pin, INPUT_PULLUP);
+    }
+    
+    sweepNumber++;
   }
-
-  Serial.print("\nMin freq: ");
-  Serial.println(min_Vz_freq);
-
-  if(sweepNumber < numberOfSweeps - 1){
-    starting_freq = min_Vz_freq - 3*freq_step;
-    max_freq = min_Vz_freq + 3*freq_step;
-    freq_step = freq_step / 2;
-  }
-
-  if(sweepNumber = numberOfSweeps - 1){
-    freq_step = final_freq_step;
-  }
-  
-  if(sweepNumber > numberOfSweeps) while(1);
-  
-  sweepNumber++;
-
-  
-  /*Serial.println("Sending to phone");
-  sendEyePressureToPhone();*/
-  /*writeddschip(1000000);
-  readVoltages();
-  Serial.println(Vz, 4);*/
-  //Serial.println("Data sent to phone");
-  //while(1);
   
 } // end loop()
 
@@ -219,7 +232,6 @@ void readVoltages() {
   }
   
   Vz = Vz / numberOfSamples;
-  
 } // end of readVoltages()
 
 
@@ -228,6 +240,7 @@ void readVoltages() {
 // *** Function to store necessary values in an array
 // ***
 void storeValues(){
+  
   Vz_values[counter[sweepNumber - 1]][sweepNumber - 1] = Vz * 3.3 / 1023.0; // Store calculated values in an array
   freq_values[counter[sweepNumber - 1]][sweepNumber - 1] = freq;
   
@@ -255,7 +268,8 @@ void calculateMovingAverage(){
   Vz_moving_avg[arraySize-1][sweepNumber - 1] = Vz_values[arraySize-1][sweepNumber - 1];
   Vz_moving_avg[arraySize-2][sweepNumber - 1] = Vz_values[arraySize-2][sweepNumber - 1];
   for (int i = 2; i < arraySize - 2; i++){
-    Vz_moving_avg[i][sweepNumber - 1] = (Vz_values[i+2][sweepNumber - 1] + Vz_values[i+1][sweepNumber - 1] + Vz_values[i-2][sweepNumber - 1] + Vz_values[i-1][sweepNumber - 1] + Vz_values[i][sweepNumber - 1]) / 5;
+    Vz_moving_avg[i][sweepNumber - 1] = (Vz_values[i+2][sweepNumber - 1] + Vz_values[i+1][sweepNumber - 1] + 
+      Vz_values[i-2][sweepNumber - 1] + Vz_values[i-1][sweepNumber - 1] + Vz_values[i][sweepNumber - 1]) / 5;
   }
 } // end of calculateMovingAverage()
 
@@ -277,11 +291,13 @@ void serialPrintTable(){
 // *** Function to send information to phone
 // ***
 void serialPrintAllSweeps(){
-  for (int i = 0; i < numberOfSweeps; i++){
-    Serial.print(freq);
-    Serial.print("   ");
-    Serial.println(Vz_values[counter[sweepNumber - 1]-1][sweepNumber - 1], 4);
-  }
+  /*for (int i = 0; i < numberOfSweeps; i++){
+    for (int j = 0; j < sweepSize[i]; j++){
+      Serial.print(freq);
+      Serial.print("   ");
+      Serial.println(Vz_values[counter[sweepNumber - 1]-1][sweepNumber - 1], 4);
+    }
+  }*/
 }
 
 
@@ -289,9 +305,9 @@ void serialPrintAllSweeps(){
 // ***
 // *** Function to send information to phone
 // ***
-void sendEyePressureToPhone(){
+void sendDataToPhone(){
 
-
+  // Send graph of whole sweep
   Serial.println("Checking for connection");
   while(! ble.isConnected()){
     delay(200); //wait for a phone to be connected
